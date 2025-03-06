@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Draggable Minimalist Organizer</title>
+    <style>
+        body {
+            font-family: 'Bebas Neue', sans-serif;
+            background-image: url('background.jpg');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .container {
+            position: absolute;
+            cursor: grab;
+        }
+        .calendar-container, .todo-container, .clock-container {
+            width: 300px;
+            text-align: center;
+        }
+        .calendar-container h3 {
+            text-align: center;
+        }
+        .nav-buttons {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .nav-buttons button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 18px;
+        }
+        .calendar {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+            margin-top: 10px;
+        }
+        .day {
+            padding: 10px;
+            cursor: pointer;
+            position: relative;
+        }
+        .day.has-event {
+            background-color: rgba(255, 192, 203, 0.5);
+            border-radius: 50%;
+            position: relative;
+            color: black;
+        }
+        .day.has-event::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 6px;
+            height: 6px;
+            background-color: rgba(255, 192, 203, 0.5);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .event-list {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: white;
+            border: 1px solid #ccc;
+            padding: 10px;
+            z-index: 10;
+            display: none;
+            width: 200px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        .event-list::before {
+            content: '';
+            position: absolute;
+            top: -10px;
+            left: 10px;
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-bottom: 10px solid white;
+        }
+        .event-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 5px 0;
+            padding: 5px;
+            border-radius: 5px;
+            background-color: white;
+        }
+        .event-item span {
+            flex-grow: 1;
+            margin-right: 10px;
+            word-wrap: break-word;
+        }
+        .event-item button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: red;
+            margin-left: 5px;
+        }
+        .todo-list {
+            list-style: none;
+            padding: 0;
+            text-align: left;
+            color: white; /* Set text color to white */
+        }
+        .todo-list li {
+            display: flex;
+            align-items: center;
+            margin: 5px 0;
+            color: white; /* Ensure text color is white */
+        }
+        .todo-list input[type="checkbox"] {
+            margin-right: 10px;
+        }
+        .delete-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            margin-left: auto;
+            color: red; /* Keep the delete button red for visibility */
+        }
+        #todoInput {
+            margin-top: 5px;
+            width: 100%;
+            padding: 5px;
+            border: none; /* Remove the border */
+            background: transparent; /* Remove the white background */
+            outline: none; /* Remove the focus outline (optional) */
+            color: white; /* Set text color to white */
+            font-family: inherit; /* Inherit font from parent */
+            font-size: 16px;
+        }
+/* Style for the To-Do List title */
+.todo-container h3 {
+    color: white; /* Set the title text color to white */
+}
+        #clock {
+            font-size: 32px;
+        }
+        #current-date {
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container clock-container" id="clockContainer">
+        <div id="clock"></div>
+        <div id="current-date"></div>
+    </div>
+
+    <div class="container todo-container" id="todoContainer">
+        <h3>To-Do List</h3>
+        <input type="text" id="todoInput" placeholder="Enter task...">
+        <ul id="todoList" class="todo-list"></ul>
+    </div>
+
+    <div class="container calendar-container" id="calendarContainer">
+        <div class="nav-buttons">
+            <button onclick="prevMonth()">&#9665;</button>
+            <h3 id="month-year">March 2025</h3>
+            <button onclick="nextMonth()">&#9655;</button>
+        </div>
+        <div class="calendar" id="calendar"></div>
+    </div>
+
+    <script>
+        // Store events in an object: { "YYYY-MM-DD": ["event1", "event2", ...] }
+        const events = {};
+
+        function updateClock() {
+            const now = new Date();
+            const options = { weekday: 'short', month: 'short', day: '2-digit' };
+            document.getElementById("clock").innerText = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            document.getElementById("current-date").innerText = now.toLocaleDateString('en-US', options);
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        document.getElementById("todoInput").addEventListener("keypress", function (event) {
+            if (event.key === "Enter") {
+                addTask();
+            }
+        });
+
+        function addTask() {
+            const task = document.getElementById("todoInput").value;
+            if (task) {
+                const li = document.createElement("li");
+                const checkbox = document.createElement("input");
+                checkbox.type = "checkbox";
+                const deleteBtn = document.createElement("button");
+                deleteBtn.innerText = "x";
+                deleteBtn.classList.add("delete-btn");
+                deleteBtn.onclick = () => li.remove();
+
+                li.appendChild(checkbox);
+                li.appendChild(document.createTextNode(task));
+                li.appendChild(deleteBtn);
+                document.getElementById("todoList").appendChild(li);
+                document.getElementById("todoInput").value = "";
+            }
+        }
+
+        function makeDraggable(el) {
+            let offsetX, offsetY, isDragging = false;
+            el.addEventListener("mousedown", (e) => {
+                isDragging = true;
+                offsetX = e.clientX - el.getBoundingClientRect().left;
+                offsetY = e.clientY - el.getBoundingClientRect().top;
+                el.style.cursor = "grabbing";
+            });
+            document.addEventListener("mousemove", (e) => {
+                if (isDragging) {
+                    el.style.left = `${e.clientX - offsetX}px`;
+                    el.style.top = `${e.clientY - offsetY}px`;
+                }
+            });
+            document.addEventListener("mouseup", () => {
+                isDragging = false;
+                el.style.cursor = "grab";
+            });
+        }
+
+        document.querySelectorAll(".container").forEach(makeDraggable);
+
+        let currentMonth = new Date().getMonth();
+        let currentYear = new Date().getFullYear();
+        const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+        function generateCalendar(month, year) {
+            const calendar = document.getElementById("calendar");
+            calendar.innerHTML = "";
+
+            document.getElementById("month-year").textContent = `${monthNames[month]} ${year}`;
+
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+            const weekdays = ["S", "M", "T", "W", "T", "F", "S"];
+            weekdays.forEach(day => {
+                const dayElement = document.createElement("div");
+                dayElement.textContent = day;
+                dayElement.style.fontWeight = "bold";
+                calendar.appendChild(dayElement);
+            });
+
+            for (let i = 0; i < firstDay; i++) {
+                const emptyCell = document.createElement("div");
+                calendar.appendChild(emptyCell);
+            }
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dayElement = document.createElement("div");
+                dayElement.classList.add("day");
+                dayElement.textContent = day;
+
+                const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                if (events[dateKey]) {
+                    dayElement.classList.add("has-event");
+                    const eventList = document.createElement("div");
+                    eventList.classList.add("event-list");
+
+                    events[dateKey].forEach((event, index) => {
+                        const eventItem = document.createElement("div");
+                        eventItem.classList.add("event-item");
+
+                        const eventText = document.createElement("span");
+                        eventText.textContent = event;
+
+                        const deleteBtn = document.createElement("button");
+                        deleteBtn.innerText = "x";
+                        deleteBtn.onclick = (e) => {
+                            e.stopPropagation(); // Prevent event propagation
+                            events[dateKey].splice(index, 1); // Remove the event
+                            if (events[dateKey].length === 0) delete events[dateKey]; // Clean up if no events left
+                            generateCalendar(currentMonth, currentYear); // Refresh calendar
+                        };
+
+                        eventItem.appendChild(eventText);
+                        eventItem.appendChild(deleteBtn);
+                        eventList.appendChild(eventItem);
+                    });
+
+                    dayElement.appendChild(eventList);
+                    dayElement.addEventListener("mouseenter", () => {
+                        eventList.style.display = "block";
+                    });
+                    dayElement.addEventListener("mouseleave", () => {
+                        eventList.style.display = "none";
+                    });
+                }
+
+                dayElement.addEventListener("click", () => {
+                    const eventText = prompt(`Add event(s) for ${monthNames[month]} ${day}, ${year} (separate multiple events with commas):`);
+                    if (eventText) {
+                        if (!events[dateKey]) events[dateKey] = [];
+                        const newEvents = eventText.split(",").map(e => e.trim()).filter(e => e); // Split by commas and trim whitespace
+                        events[dateKey].push(...newEvents); // Add all new events
+                        generateCalendar(currentMonth, currentYear); // Refresh calendar
+                    }
+                });
+
+                calendar.appendChild(dayElement);
+            }
+        }
+
+        function prevMonth() {
+            if (currentMonth === 0) {
+                currentMonth = 11;
+                currentYear--;
+            } else {
+                currentMonth--;
+            }
+            generateCalendar(currentMonth, currentYear);
+        }
+
+        function nextMonth() {
+            if (currentMonth === 11) {
+                currentMonth = 0;
+                currentYear++;
+            } else {
+                currentMonth++;
+            }
+            generateCalendar(currentMonth, currentYear);
+        }
+
+        generateCalendar(currentMonth, currentYear);
+    </script>
+</body>
+</html>
